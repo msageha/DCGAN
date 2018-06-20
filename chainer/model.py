@@ -33,7 +33,6 @@ class Generator(chainer.Chain):
         return numpy.random.uniform(-1, 1, (batchsize, self.n_hidden, 1, 1)).astype(numpy.float32)
  
     def __call__(self, z):
-        ipdb.set_trace()
         h0 = self.l0(z)
         # h0.shape = (-1, 73728)
         h1 = F.reshape(h0, (len(z), self.ch, self.bottom_width, self.bottom_width))
@@ -70,7 +69,6 @@ class Discriminator(chainer.Chain):
  
  
     def __call__(self, x):
-        ipdb.set_trace()
         #x.shape = (-1, 1, 256, 256)
         h0 = F.leaky_relu(self.c0(x))
         #h0.shape = (-1, 64, 86, 86)
