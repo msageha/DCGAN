@@ -17,7 +17,7 @@ def load_image(path='images/'):
     dataset = []
     for file in os.listdir(path):
         img = Image.open(path+file)
-        img = np.asarray(img.convert('L')).astype(np.float32).reshape(1, 256, 256)
+        img = np.asarray(img.resize((32, 32)).convert('L')).astype(np.float32).reshape(1, 32, 32)
         dataset.append(img)
     return np.array(dataset)
 
@@ -33,7 +33,7 @@ def main():
                         help='Directory to output the result')
     parser.add_argument('--resume', '-r', default='',
                         help='Resume the training from snapshot')
-    parser.add_argument('--n_hidden', '-n', type=int, default=100,
+    parser.add_argument('--n_hidden', '-n', type=int, default=128,
                         help='Number of hidden units (z)')
     parser.add_argument('--seed', type=int, default=0,
                         help='Random seed of z at visualization stage')
