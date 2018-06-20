@@ -8,7 +8,7 @@ import chainer.links as L
 import ipdb
  
 class Generator(chainer.Chain):
-    def __init__(self, n_hidden, bottom_width=3, ch=512, wscale=0.02):
+    def __init__(self, n_hidden, bottom_width=12, ch=512, wscale=0.02):
         super(Generator, self).__init__()
         self.n_hidden = n_hidden
         self.ch = ch
@@ -35,8 +35,11 @@ class Generator(chainer.Chain):
     def __call__(self, z):
         ipdb.set_trace()
         h0 = self.l0(z)
+        # h0.shape = (-1, 73728)
         h1 = F.reshape(h0, (len(z), self.ch, self.bottom_width, self.bottom_width))
+        # h1.shape = (-1, 512, 12, 12)
         h2 = F.relu(self.bn1(h1))
+        # h1.shape = (-1, 512, 12, 12)
         h3 = F.relu(self.bn2(self.dc1(h2)))
         h4 = F.relu(self.bn3(self.dc2(h3)))
         h5 = F.relu(self.bn4(self.dc3(h4)))
@@ -68,10 +71,15 @@ class Discriminator(chainer.Chain):
  
     def __call__(self, x):
         ipdb.set_trace()
+        #x.shape = (-1, 1, 256, 256)
         h0 = F.leaky_relu(self.c0(x))
+        #h0.shape = (-1, 64, 86, 86)
         h1 = F.leaky_relu(self.bn1(self.c1(h0)))
+        #h1.shape = (-1, 128, 44, 44)
         h2 = F.leaky_relu(self.bn2(self.c2(h1)))
+        #h2.shape = (-1, 256, 23, 23)
         h3 = F.leaky_relu(self.bn3(self.c3(h2)))
+        #h3.shape = (-1, 512, 12, 12)
         y = self.l4(h3)
  
         return y
