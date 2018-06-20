@@ -155,7 +155,6 @@ def train_dcgan_labeled(gen, dis, epoch0=0):
     zvis = (xp.random.uniform(-1, 1, (100, nz), dtype=np.float32))
     
     for epoch in range(epoch0,n_epoch):
-        perm = np.random.permutation(n_train)
         sum_l_dis = np.float32(0)
         sum_l_gen = np.float32(0)
         
@@ -194,23 +193,22 @@ def train_dcgan_labeled(gen, dis, epoch0=0):
             
             #print "forward done"
 
-            o_gen.zero_grads()
+            o_gen.use_cleargrads(use=True)
             L_gen.backward()
             o_gen.update()
             
-            o_dis.zero_grads()
+            o_dis.use_cleargrads(use=True)
             L_dis.backward()
             o_dis.update()
             
             sum_l_gen += L_gen.data.get()
             sum_l_dis += L_dis.data.get()
-            
+
             #print "backward done"
 
             if i%image_save_interval==0:
                 pylab.rcParams['figure.figsize'] = (16.0,16.0)
                 pylab.clf()
-                vissize = 100
                 z = zvis
                 z[50:,:] = (xp.random.uniform(-1, 1, (50, nz), dtype=np.float32))
                 z = Variable(z)
