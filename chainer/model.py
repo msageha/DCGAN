@@ -34,13 +34,13 @@ class Generator(chainer.Chain):
  
     def __call__(self, z):
         ipdb.set_trace()
-        h = self.l0(z)
-        h = F.reshape(h, (len(z), self.ch, self.bottom_width, self.bottom_width))
-        h = F.relu(self.bn1(h))
-        h = F.relu(self.bn2(self.dc1(h)))
-        h = F.relu(self.bn3(self.dc2(h)))
-        h = F.relu(self.bn4(self.dc3(h)))
-        x = F.sigmoid(self.dc4(h))
+        h0 = self.l0(z)
+        h1 = F.reshape(h0, (len(z), self.ch, self.bottom_width, self.bottom_width))
+        h2 = F.relu(self.bn1(h1))
+        h3 = F.relu(self.bn2(self.dc1(h2)))
+        h4 = F.relu(self.bn3(self.dc2(h3)))
+        h5 = F.relu(self.bn4(self.dc3(h4)))
+        x = F.sigmoid(self.dc4(h5))
         # x = F.tanh(self.dc4(h))
  
         return x
