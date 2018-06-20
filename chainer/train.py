@@ -19,11 +19,12 @@ def load_image(path='images/'):
         img = Image.open(path+file)
         img = np.asarray(img.resize((32, 32)).convert('L')).astype(np.float32).reshape(1, 32, 32)
         dataset.append(img)
+    print('data length:', len(dataset))
     return np.array(dataset)
 
 def main():
     parser = argparse.ArgumentParser(description='Chainer: DCGAN MNIST')
-    parser.add_argument('--batchsize', '-b', type=int, default=50,
+    parser.add_argument('--batchsize', '-b', type=int, default=20,
                         help='Number of images in each mini-batch')
     parser.add_argument('--epoch', '-e', type=int, default=100,
                         help='Number of sweeps over the dataset to train')
