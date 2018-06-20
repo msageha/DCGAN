@@ -37,7 +37,7 @@ print(len(fs))
 dataset = []
 for fn in fs:
     img = Image.open('%s/%s'%(image_dir,fn), 'r')
-    img = img.resize((64, 64))
+    img = img.resize((96, 96))
     dataset.append(img)
 print(len(dataset))
 
