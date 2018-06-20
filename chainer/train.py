@@ -1,238 +1,103 @@
-import pickle
-import numpy as np
-from PIL import Image
+import argparse
 import os
-import math
-import pylab
 
 import chainer
-from chainer import computational_graph
-from chainer import cuda
-from chainer import optimizers
-from chainer import serializers
-from chainer import Variable
-from chainer.utils import type_check
-from chainer import function
+from chainer import training
+from chainer.training import extensions
 
-import chainer.functions as F
-import chainer.links as L
+from model import Discriminator
+from model import Generator
+from updater import DCGANUpdater
+from visualize import out_generated_image
 
-import numpy
+from PIL import Image
+import numpy as np
 
+def load_image(path='images/'):
+    dataset = []
+    for file in os.listdir(path):
+        img = Image.open(path+file)
+        img = np.asarray(img.convert('RGB')).astype(np.float32).transpose(2, 0, 1)
+        dataset.append(img)
+    return np.array(dataset)
 
-image_dir = './images'
-out_image_dir = './out_images'
-out_model_dir = './out_models'
+def main():
+    parser = argparse.ArgumentParser(description='Chainer: DCGAN MNIST')
+    parser.add_argument('--batchsize', '-b', type=int, default=50,
+                        help='Number of images in each mini-batch')
+    parser.add_argument('--epoch', '-e', type=int, default=100,
+                        help='Number of sweeps over the dataset to train')
+    parser.add_argument('--gpu', '-g', type=int, default=0,
+                        help='GPU ID (negative value indicates CPU)')
+    parser.add_argument('--out', '-o', default='result',
+                        help='Directory to output the result')
+    parser.add_argument('--resume', '-r', default='',
+                        help='Resume the training from snapshot')
+    parser.add_argument('--n_hidden', '-n', type=int, default=100,
+                        help='Number of hidden units (z)')
+    parser.add_argument('--seed', type=int, default=0,
+                        help='Random seed of z at visualization stage')
+    parser.add_argument('--snapshot_interval', type=int, default=1000,
+                        help='Interval of snapshot')
+    parser.add_argument('--display_interval', type=int, default=100,
+                        help='Interval of displaying log to console')
+    args = parser.parse_args()
 
-nz = 100          # # of dim for Z
-batchsize=100
-n_epoch=10000
-n_train=200000
-image_save_interval = 50000
+    print('GPU: {}'.format(args.gpu))
+    print('# Minibatch-size: {}'.format(args.batchsize))
+    print('# n_hidden: {}'.format(args.n_hidden))
+    print('# epoch: {}'.format(args.epoch))
+    print('')
 
-# read all images
+    # Set up a neural network to train
+    gen = Generator(n_hidden=args.n_hidden)
+    dis = Discriminator()
 
-fs = os.listdir(image_dir)
-print(len(fs))
-dataset = []
-for fn in fs:
-    img = Image.open('%s/%s'%(image_dir,fn), 'r')
-    img = img.resize((96, 96))
-    dataset.append(img)
-print(len(dataset))
+    if args.gpu >= 0:
+        # Make a specified GPU current
+        chainer.cuda.get_device_from_id(args.gpu).use()
+        gen.to_gpu()  # Copy the model to the GPU
+        dis.to_gpu()
 
-class ELU(function.Function):
+    # Setup an optimizer
+    def make_optimizer(model, alpha=0.0002, beta1=0.5):
+        optimizer = chainer.optimizers.Adam(alpha=alpha, beta1=beta1)
+        optimizer.setup(model)
+        optimizer.add_hook(chainer.optimizer.WeightDecay(0.0001), 'hook_dec')
+        return optimizer
 
-    """Exponential Linear Unit."""
-    # https://github.com/muupan/chainer-elu
+    opt_gen = make_optimizer(gen)
+    opt_dis = make_optimizer(dis)
 
-    def __init__(self, alpha=1.0):
-        self.alpha = numpy.float32(alpha)
+    # Load the MNIST dataset
+    train = load_image()
 
-    def check_type_forward(self, in_types):
-        type_check.expect(in_types.size() == 1)
-        x_type, = in_types
+    train_iter = chainer.iterators.SerialIterator(train, args.batchsize)
 
-        type_check.expect(
-            x_type.dtype == numpy.float32,
-        )
+    # Set up a trainer
+    updater = DCGANUpdater(models=(gen, dis), iterator=train_iter, optimizer={'gen':opt_gen, 'dis':opt_dis}, device=args.gpu)
+    trainer = training.Trainer(updater, (args.epoch, 'epoch'), out=args.out)
 
-    def forward_cpu(self, x):
-        y = x[0].copy()
-        neg_indices = x[0] < 0
-        y[neg_indices] = self.alpha * (numpy.exp(y[neg_indices]) - 1)
-        return y,
+    epoch_interval = (1, 'epoch')
+    display_interval = (args.display_interval, 'iteration')
+    # trainer.extend(extensions.snapshot(filename='snapshot_iter_{.updater.iteration}.npz'), trigger=snapshot_interval)
+    # trainer.extend(extensions.snapshot_object(gen, 'gen_iter_{.updater.iteration}.npz'), trigger=snapshot_interval)
+    # trainer.extend(extensions.snapshot_object(dis, 'dis_iter_{.updater.iteration}.npz'), trigger=snapshot_interval)
+    trainer.extend(extensions.snapshot(filename='snapshot_epoch_{.updater.epoch}.npz'), trigger=epoch_interval)
+    trainer.extend(extensions.snapshot_object(gen, 'gen_epoch_{.updater.epoch}.npz'), trigger=epoch_interval)
+    trainer.extend(extensions.snapshot_object(dis, 'dis_epoch_{.updater.epoch}.npz'), trigger=epoch_interval)
+    trainer.extend(extensions.LogReport(trigger=display_interval))
+    trainer.extend(extensions.PrintReport(['epoch', 'iteration', 'gen/loss', 'dis/loss',]), trigger=display_interval)
+    trainer.extend(extensions.ProgressBar(update_interval=10))
+    trainer.extend(out_generated_image(gen, dis, 10, 10, args.seed, args.out), trigger=epoch_interval)
 
-    def forward_gpu(self, x):
-        y = cuda.elementwise(
-            'T x, T alpha', 'T y',
-            'y = x >= 0 ? x : alpha * (exp(x) - 1)', 'elu_fwd')(
-                x[0], self.alpha)
-        return y,
+    if args.resume:
+        # Resume from a snapshot
+        chainer.serializers.load_npz(args.resume, trainer)
 
-    def backward_cpu(self, x, gy):
-        gx = gy[0].copy()
-        neg_indices = x[0] < 0
-        gx[neg_indices] *= self.alpha * numpy.exp(x[0][neg_indices])
-        return gx,
-
-    def backward_gpu(self, x, gy):
-        gx = cuda.elementwise(
-            'T x, T gy, T alpha', 'T gx',
-            'gx = x >= 0 ? gy : gy * alpha * exp(x)', 'elu_bwd')(
-                x[0], gy[0], self.alpha)
-        return gx,
-
-
-def elu(x, alpha=1.0):
-    """Exponential Linear Unit function."""
-    # https://github.com/muupan/chainer-elu
-    return ELU(alpha=alpha)(x)
-
-class Generator(chainer.Chain):
-    def __init__(self):
-        super(Generator, self).__init__(
-            l0z = L.Linear(nz, 6*6*512),
-            dc1 = L.Deconvolution2D(512, 256, 4, stride=2, pad=1),
-            dc2 = L.Deconvolution2D(256, 128, 4, stride=2, pad=1),
-            dc3 = L.Deconvolution2D(128, 64, 4, stride=2, pad=1),
-            dc4 = L.Deconvolution2D(64, 3, 4, stride=2, pad=1),
-            bn0l = L.BatchNormalization(6*6*512),
-            bn0 = L.BatchNormalization(512),
-            bn1 = L.BatchNormalization(256),
-            bn2 = L.BatchNormalization(128),
-            bn3 = L.BatchNormalization(64),
-        )
-        
-    def __call__(self, z):
-        h = F.reshape(F.relu(self.bn0l(self.l0z(z))), (z.data.shape[0], 512, 6, 6))
-        h = F.relu(self.bn1(self.dc1(h)))
-        h = F.relu(self.bn2(self.dc2(h)))
-        h = F.relu(self.bn3(self.dc3(h)))
-        x = (self.dc4(h))
-        return x
+    # Run the training
+    trainer.run()
 
 
-
-class Discriminator(chainer.Chain):
-    def __init__(self):
-        super(Discriminator, self).__init__(
-            c0 = L.Convolution2D(3, 64, 4, stride=2, pad=1),
-            c1 = L.Convolution2D(64, 128, 4, stride=2, pad=1),
-            c2 = L.Convolution2D(128, 256, 4, stride=2, pad=1),
-            c3 = L.Convolution2D(256, 512, 4, stride=2, pad=1),
-            l4l = L.Linear(6*6*512, 2),
-            bn0 = L.BatchNormalization(64),
-            bn1 = L.BatchNormalization(128),
-            bn2 = L.BatchNormalization(256),
-            bn3 = L.BatchNormalization(512),
-        )
-        
-    def __call__(self, x):
-        h = elu(self.c0(x))     # no bn because images from generator will katayotteru?
-        h = elu(self.bn1(self.c1(h)))
-        h = elu(self.bn2(self.c2(h)))
-        h = elu(self.bn3(self.c3(h)))
-        l = self.l4l(h)
-        return l
-
-
-def clip_img(x):
-	return np.float32(-1 if x<-1 else (1 if x>1 else x))
-
-
-def train_dcgan_labeled(gen, dis, epoch0=0):
-    o_gen = optimizers.Adam(alpha=0.0002, beta1=0.5)
-    o_dis = optimizers.Adam(alpha=0.0002, beta1=0.5)
-    o_gen.setup(gen)
-    o_dis.setup(dis)
-    o_gen.add_hook(chainer.optimizer.WeightDecay(0.00001))
-    o_dis.add_hook(chainer.optimizer.WeightDecay(0.00001))
-
-    zvis = (xp.random.uniform(-1, 1, (100, nz), dtype=np.float32))
-    
-    for epoch in range(epoch0,n_epoch):
-        sum_l_dis = np.float32(0)
-        sum_l_gen = np.float32(0)
-        
-        for i in range(0, n_train, batchsize):
-            # discriminator
-            # 0: from dataset
-            # 1: from noise
-
-            #print "load image start ", i
-            x2 = np.zeros((batchsize, 3, 96, 96), dtype=np.float32)
-            for j in range(batchsize):
-                rnd = np.random.randint(len(dataset))
-                rnd2 = np.random.randint(2)
-                img = np.asarray(dataset[rnd].convert('RGB')).astype(np.float32).transpose(2, 0, 1)
-                if rnd2==0:
-                    x2[j,:,:,:] = (img[:,:,::-1]-128.0)/128.0
-                else:
-                    x2[j,:,:,:] = (img[:,:,:]-128.0)/128.0
-            #print "load image done"
-            
-            # train generator
-            z = Variable(xp.random.uniform(-1, 1, (batchsize, nz), dtype=np.float32))
-            x = gen(z)
-            yl = dis(x)
-            L_gen = F.softmax_cross_entropy(yl, Variable(xp.zeros(batchsize, dtype=np.int32)))
-            L_dis = F.softmax_cross_entropy(yl, Variable(xp.ones(batchsize, dtype=np.int32)))
-            
-            # train discriminator
-                    
-            x2 = Variable(cuda.to_gpu(x2))
-            yl2 = dis(x2)
-            L_dis += F.softmax_cross_entropy(yl2, Variable(xp.zeros(batchsize, dtype=np.int32)))
-            
-            #print "forward done"
-
-            o_gen.use_cleargrads(use=True)
-            L_gen.backward()
-            o_gen.update()
-            
-            o_dis.use_cleargrads(use=True)
-            L_dis.backward()
-            o_dis.update()
-            
-            sum_l_gen += L_gen.data.get()
-            sum_l_dis += L_dis.data.get()
-
-            #print "backward done"
-
-            if i%image_save_interval==0:
-                pylab.rcParams['figure.figsize'] = (16.0,16.0)
-                z = zvis
-                z[50:,:] = (xp.random.uniform(-1, 1, (50, nz), dtype=np.float32))
-                z = Variable(z)
-                x = gen(z)
-                x = x.data.get()
-                for i_ in range(100):
-                    tmp = ((np.vectorize(clip_img)(x[i_,:,:,:])+1)/2).transpose(1,2,0)
-                    pylab.subplot(10,10,i_+1)
-                    pylab.imshow(tmp)
-                    pylab.axis('off')
-                pylab.savefig('%s/vis_%d_%d.png'%(out_image_dir, epoch,i))
-                
-        serializers.save_hdf5("%s/dcgan_model_dis_%d.h5"%(out_model_dir, epoch),dis)
-        serializers.save_hdf5("%s/dcgan_model_gen_%d.h5"%(out_model_dir, epoch),gen)
-        serializers.save_hdf5("%s/dcgan_state_dis_%d.h5"%(out_model_dir, epoch),o_dis)
-        serializers.save_hdf5("%s/dcgan_state_gen_%d.h5"%(out_model_dir, epoch),o_gen)
-        print('epoch end', epoch, sum_l_gen/n_train, sum_l_dis/n_train)
-
-
-xp = cuda.cupy
-cuda.get_device(0).use()
-
-gen = Generator()
-dis = Discriminator()
-gen.to_gpu()
-dis.to_gpu()
-
-try:
-    os.mkdir(out_image_dir)
-    os.mkdir(out_model_dir)
-except:
-    pass
-
-train_dcgan_labeled(gen, dis)
+if __name__ == '__main__':
+    main()
