@@ -8,7 +8,7 @@ import chainer.links as L
 import ipdb
  
 class Generator(chainer.Chain):
-    def __init__(self, n_hidden, bottom_width=12, ch=512, wscale=0.02):
+    def __init__(self, n_hidden, bottom_width=3, ch=512, wscale=0.02):
         super(Generator, self).__init__()
         self.n_hidden = n_hidden
         self.ch = ch
