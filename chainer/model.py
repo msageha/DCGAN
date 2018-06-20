@@ -66,11 +66,10 @@ class Discriminator(chainer.Chain):
  
  
     def __call__(self, x):
-        ipdb.set_trace()
-        h = F.leaky_relu(self.c0(x))
-        h = F.leaky_relu(self.bn1(self.c1(h)))
-        h = F.leaky_relu(self.bn2(self.c2(h)))
-        h = F.leaky_relu(self.bn3(self.c3(h)))
-        y = self.l4(h)
+        h0 = F.leaky_relu(self.c0(x))
+        h1 = F.leaky_relu(self.bn1(self.c1(h0)))
+        h2 = F.leaky_relu(self.bn2(self.c2(h1)))
+        h3 = F.leaky_relu(self.bn3(self.c3(h2)))
+        y = self.l4(h3)
  
         return y
