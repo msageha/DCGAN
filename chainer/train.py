@@ -17,7 +17,7 @@ def load_image(path='images/'):
     dataset = []
     for file in os.listdir(path):
         img = Image.open(path+file)
-        img = np.asarray(img.convert('L')).astype(np.float32).reshape(1, 256, 256).transpose(2, 0, 1)
+        img = np.asarray(img.convert('L')).astype(np.float32).reshape(1, 256, 256)
         dataset.append(img)
     return np.array(dataset)
 
@@ -71,7 +71,6 @@ def main():
 
     # Load the MNIST dataset
     train = load_image()
-    train, _ = chainer.datasets.get_mnist(withlabel=False, ndim=3, scale=255.)
 
     train_iter = chainer.iterators.SerialIterator(train, args.batchsize)
 
