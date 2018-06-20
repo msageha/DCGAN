@@ -202,7 +202,6 @@ def train_dcgan_labeled(gen, dis, epoch0=0):
 
             if i%image_save_interval==0:
                 pylab.rcParams['figure.figsize'] = (16.0,16.0)
-                pylab.clf()
                 z = zvis
                 z[50:,:] = (xp.random.uniform(-1, 1, (50, nz), dtype=np.float32))
                 z = Variable(z)
