@@ -5,6 +5,7 @@ from chainer import cuda
 import chainer.functions as F
 import chainer.links as L
  
+import ipdb
  
 class Generator(chainer.Chain):
     def __init__(self, n_hidden, bottom_width=3, ch=512, wscale=0.02):
@@ -65,6 +66,7 @@ class Discriminator(chainer.Chain):
  
  
     def __call__(self, x):
+        ipdb.set_trace()
         h = F.leaky_relu(self.c0(x))
         h = F.leaky_relu(self.bn1(self.c1(h)))
         h = F.leaky_relu(self.bn2(self.c2(h)))
