@@ -95,11 +95,11 @@ def elu(x, alpha=1.0):
 class Generator(chainer.Chain):
     def __init__(self):
         super(Generator, self).__init__(
-            l0z = L.Linear(nz, 6*6*512, wscale=0.02*math.sqrt(nz)),
-            dc1 = L.Deconvolution2D(512, 256, 4, stride=2, pad=1, wscale=0.02*math.sqrt(4*4*512)),
-            dc2 = L.Deconvolution2D(256, 128, 4, stride=2, pad=1, wscale=0.02*math.sqrt(4*4*256)),
-            dc3 = L.Deconvolution2D(128, 64, 4, stride=2, pad=1, wscale=0.02*math.sqrt(4*4*128)),
-            dc4 = L.Deconvolution2D(64, 3, 4, stride=2, pad=1, wscale=0.02*math.sqrt(4*4*64)),
+            l0z = L.Linear(nz, 6*6*512),
+            dc1 = L.Deconvolution2D(512, 256, 4, stride=2, pad=1),
+            dc2 = L.Deconvolution2D(256, 128, 4, stride=2, pad=1),
+            dc3 = L.Deconvolution2D(128, 64, 4, stride=2, pad=1),
+            dc4 = L.Deconvolution2D(64, 3, 4, stride=2, pad=1),
             bn0l = L.BatchNormalization(6*6*512),
             bn0 = L.BatchNormalization(512),
             bn1 = L.BatchNormalization(256),
@@ -120,11 +120,11 @@ class Generator(chainer.Chain):
 class Discriminator(chainer.Chain):
     def __init__(self):
         super(Discriminator, self).__init__(
-            c0 = L.Convolution2D(3, 64, 4, stride=2, pad=1, wscale=0.02*math.sqrt(4*4*3)),
-            c1 = L.Convolution2D(64, 128, 4, stride=2, pad=1, wscale=0.02*math.sqrt(4*4*64)),
-            c2 = L.Convolution2D(128, 256, 4, stride=2, pad=1, wscale=0.02*math.sqrt(4*4*128)),
-            c3 = L.Convolution2D(256, 512, 4, stride=2, pad=1, wscale=0.02*math.sqrt(4*4*256)),
-            l4l = L.Linear(6*6*512, 2, wscale=0.02*math.sqrt(6*6*512)),
+            c0 = L.Convolution2D(3, 64, 4, stride=2, pad=1),
+            c1 = L.Convolution2D(64, 128, 4, stride=2, pad=1),
+            c2 = L.Convolution2D(128, 256, 4, stride=2, pad=1),
+            c3 = L.Convolution2D(256, 512, 4, stride=2, pad=1),
+            l4l = L.Linear(6*6*512, 2),
             bn0 = L.BatchNormalization(64),
             bn1 = L.BatchNormalization(128),
             bn2 = L.BatchNormalization(256),
