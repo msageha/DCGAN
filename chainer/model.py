@@ -33,6 +33,7 @@ class Generator(chainer.Chain):
         return numpy.random.uniform(-1, 1, (batchsize, self.n_hidden, 1, 1)).astype(numpy.float32)
  
     def __call__(self, z):
+        ipdb.set_trace()
         h = self.l0(z)
         h = F.reshape(h, (len(z), self.ch, self.bottom_width, self.bottom_width))
         h = F.relu(self.bn1(h))
