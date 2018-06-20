@@ -2,7 +2,6 @@ import pickle
 import numpy as np
 from PIL import Image
 import os
-from StringIO import StringIO
 import math
 import pylab
 
