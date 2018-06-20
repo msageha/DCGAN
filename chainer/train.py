@@ -71,7 +71,8 @@ def main():
 
     # Load the MNIST dataset
     train = load_image()
-
+    train, _ = chainer.datasets.get_mnist(withlabel=False, ndim=3, scale=255.)
+    
     train_iter = chainer.iterators.SerialIterator(train, args.batchsize)
 
     # Set up a trainer
